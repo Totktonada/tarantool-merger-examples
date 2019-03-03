@@ -1,0 +1,11 @@
+# Vim Swap files
+.*.sw[a-z]
+
+# Snapshots, WAL files, logs, pid files
+*.snap
+*.xlog
+*.log
+*.pid
+
+# uuid files that is used to bootstrap vshard cluster
+chunked_example_fast/*.uuid
