@@ -167,9 +167,9 @@ following functions are used to create a source:
 
 A `gen` function should return the following values correspondingly:
 
-* <state>, <buffer> or <nil>
-* <state>, <table> or <nil>
-* <state>, <tuple> or <nil>
+* \<state\>, \<buffer\> or \<nil\>
+* \<state\>, \<table\> or \<nil\>
+* \<state\>, \<tuple\> or \<nil\>
 
 Note: The merger understands both tuples and Lua tables ({...} and
 box.tuple.new({...})) as input tuples in a table and a tuple source, but we
