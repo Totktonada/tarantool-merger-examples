@@ -37,12 +37,12 @@ local function fetch_data(conn, requests)
 
     -- Skip an array around a call return values.
     local len
-    len, buf.rpos = msgpack.decode_array(buf.rpos, buf:size())
+    len, buf.rpos = msgpack.decode_array_header(buf.rpos, buf:size())
     assert(len == 1)
 
     -- Skip an array around results (each of them is a tuple of
     -- tables).
-    len, buf.rpos = msgpack.decode_array(buf.rpos, buf:size())
+    len, buf.rpos = msgpack.decode_array_header(buf.rpos, buf:size())
     assert(len == #requests)
 
     -- We cannot use merger.new_source_frombuffer(buf) here,

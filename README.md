@@ -80,7 +80,7 @@ example above shows this approach with using `key_def_inst:merge()` method.
 ### In short
 
 * Use `skip_header = true` option for a `:select()` net.box request.
-* In addition use `msgpack.decode_array()` function to postprocess a
+* In addition use `msgpack.decode_array_header()` function to postprocess a
   net.box :call() result.
 
 See the example in the 'API and basic usage' section for the former

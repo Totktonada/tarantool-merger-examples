@@ -50,7 +50,7 @@ end
 local function decode_metainfo(buf)
     -- Skip an array around a call return values.
     local len
-    len, buf.rpos = msgpack.decode_array(buf.rpos, buf:size())
+    len, buf.rpos = msgpack.decode_array_header(buf.rpos, buf:size())
     assert(len == 2)
 
     -- Decode a first return value (metainfo).
