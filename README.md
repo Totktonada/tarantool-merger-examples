@@ -146,12 +146,28 @@ conn.space.s:select(nil, {buffer = buf})
 local buf_str = ffi.string(buf.rpos, buf.wpos - buf.rpos)
 local buf_lua = msgpack.decode(buf_str)
 print('select:\n' .. yaml.encode(buf_lua))
+-- {48: [[1], [2], [3], [4]]}
+
+local buf = buffer.ibuf()
+conn.space.s:select(nil, {buffer = buf, skip_header = true})
+local buf_str = ffi.string(buf.rpos, buf.wpos - buf.rpos)
+local buf_lua = msgpack.decode(buf_str)
+print('select:\n' .. yaml.encode(buf_lua))
+-- [[1], [2], [3], [4]]
 
 local buf = buffer.ibuf()
 conn:call('foo', nil, {buffer = buf})
 local buf_str = ffi.string(buf.rpos, buf.wpos - buf.rpos)
 local buf_lua = msgpack.decode(buf_str)
 print('call:\n' .. yaml.encode(buf_lua))
+-- {48: [[[1], [2], [3], [4]]]}
+
+local buf = buffer.ibuf()
+conn:call('foo', nil, {buffer = buf, skip_header = true})
+local buf_str = ffi.string(buf.rpos, buf.wpos - buf.rpos)
+local buf_lua = msgpack.decode(buf_str)
+print('call:\n' .. yaml.encode(buf_lua))
+-- [[[1], [2], [3], [4]]]
 
 os.exit()
 ```
