@@ -39,13 +39,12 @@ local conns = {
 
 local key_parts = conns[1].space.s.index.pk.parts
 local key_def_inst = key_def.new(key_parts)
-local ctx = merger.context.new(key_def_inst)
 local sources = {}
 for i, conn in ipairs(conns) do
     local param = {conn = conns[i], key_def = key_def_inst}
     sources[i] = merger.new_table_source(fetch_chunk, param, {})
 end
-local merger_inst = merger.new(ctx, sources)
+local merger_inst = merger.new(key_def_inst, sources)
 local res = merger_inst:select()
 print(yaml.encode(res))
 os.exit()

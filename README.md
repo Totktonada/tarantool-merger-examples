@@ -38,10 +38,6 @@ if not index.unique then
     key_def_inst = key_def_inst:merge(key_def.new(space.index[0].parts))
 end
 
--- Create a merger context.
--- NB: It worth to cache it.
-local ctx = merger.context.new(key_def_inst)
-
 -- Prepare M sources.
 local sources = {}
 for _, conn in ipairs(connects) do
@@ -52,13 +48,13 @@ for _, conn in ipairs(connects) do
 end
 
 -- Merge.
-local merger_inst = merger.new(ctx, sources)
+local merger_inst = merger.new(key_def_inst, sources)
 local res = merger_inst:select()
 ```
 
 ## How to form key parts
 
-The merger expects that each input tuple stream is sorted in the order that
+The merger expects that each input tuple stream is sorted in the order that is
 acquired for a result (via key parts and the `reverse` flag). It performs a
 kind of the merge sort: chooses a source with a minimal / maximal tuple on each
 step, consumes a tuple from this source and repeats.
@@ -202,10 +198,10 @@ limit and GT iterator (with a key extracted from a last fetched tuple).
 Note: such way to implement a cursor / a pagination will work smoothly only
 with unique indexes. See also #3898.
 
-More complex scenarious are possible: using futures (`is_async = true`
-parameters of net.box methods) to fetch a next chunk while merge a current one
-or, say, call a function with several return values (some of them need to be
-skipped manually in a `gen` function to let merger read tuples).
+More complex scenarious are possible: using futures (`is_async = true` option
+of net.box methods) to fetch a next chunk while merge a current one or, say,
+call a function with several return values (some of them need to be skipped
+manually in a `gen` function to let merger read tuples).
 
 Note: When using `is_async = true` net.box option one can lean on the fact that
 net.box writes an answer w/o yield: a partial result cannot be observed.
@@ -250,6 +246,9 @@ indexes) and use vshard API on a client.
 -- See chunked_example_fast/frontend.lua.
 ```
 
+In this example we also cache key_def instances to reuse them for processing
+results from same space and index.
+
 ## Multiplexing requests
 
 Consider the case when a network latency between storage machines and frontend
@@ -261,7 +260,7 @@ one network request. We'll consider approach when a storage function returns
 many box.space.<...>:select(<...>) results instead of one.
 
 One need to skip iproto_data header, two array headers and then run a merger N
-times on the same buffers (with the same or different contexts). No extra data
+times on the same buffers (with the same or different key_defs). No extra data
 copies, no tuples decoding into a Lua memory.
 
 ```lua
@@ -278,7 +277,7 @@ copies, no tuples decoding into a Lua memory.
 
 ## Cascading mergers
 
-The idea is simple: a merger instance itself is a merger source.
+The idea is simple: a merger instance itself is a merge source.
 
 The example below is synthetic to be simple. Real cases when cascading can be
 profitable likely involve additional layers of Tarantool instances between a
@@ -291,7 +290,7 @@ behaviour for a source and a merger looks as the good property of the API.
 <...requires...>
 
 local sources = <...100 sources...>
-local ctx = merger.context.new(key_def.new(<...>))
+local key_def_inst = key_def.new(<...>)
 
 -- Create 10 mergers with 10 sources in each.
 local middleware_mergers = {}
@@ -300,10 +299,46 @@ for i = 1, 10 do
     for j = 1, 10 do
         current_sources[j] = sources[(i - 1) * 10 + j]
     end
-    middleware_mergers[i] = merger.new(ctx, current_sources)
+    middleware_mergers[i] = merger.new(key_def_inst, current_sources)
 end
 
--- Note: Using different contexts will lead to extra copying of
--- tuples.
-local res = merger.new(ctx, middleware_mergers):select()
+local res = merger.new(key_def_inst, middleware_mergers):select()
 ```
+
+## When comparisons are fast?
+
+### In short
+
+If tuples are from a local space and a key_def for a merger is created using
+parts of an index from the space (see the 'How to form key parts' section
+above), then comparisons will be fast (and no extra tuple creations occur).
+
+If tuples are received from net.box, stored into a buffer and created with a
+buffer source, then everything is okay too.
+
+When tuples are created from Lua tables comparisons will be fast too, but the
+case possibly means that extra work is performed to decode a tuple into a Lua
+table (say, in net.box) and then to encode it to a new tuple in a merge source.
+
+When tuples are created with `box.tuple.new()` comparisons likely will be slow.
+
+### In details
+
+First, some background information. Tuples can be created with different tuple
+formats. A format in particular defines which fields have precalculated offsets
+(these offsets are stored within a tuple). When there is a precalculated offset
+reading of the field is faster: it does not require to decode the whole msgpack
+data until the field. When a tuple is obtained from a space all indexed fields
+(all fields that are part of an index from this space) have offsets. When a
+tuple is created with `box.tuple.new(<...>)` it has no offsets.
+
+A merge source differs in a way how tuples are obtained. A buffer source always
+creates tuples itself. A tuple or a table source can pass existing tuples or
+create tuples from Lua tables.
+
+When a merger acquires a tuple from a source it pass a tuple format, which can
+be used to create a tuple. So when a tuple is created by a source, field
+accesses will be fast and so comparisons will be fast. When a tuple is passes
+through a source it is possible that it lacks some offsets and so comparisons
+can be slow. In this case it is a user responsibility to provide tuples with
+needed offsets if (s)he want to do merge faster.

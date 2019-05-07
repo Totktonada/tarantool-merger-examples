@@ -3,7 +3,7 @@
 local buffer = require('buffer')
 local msgpack = require('msgpack')
 local net_box = require('net.box')
-local key_def = require('key_def')
+local key_def_lib = require('key_def')
 local merger = require('merger')
 local yaml = require('yaml')
 
@@ -58,10 +58,10 @@ local conns = {
 }
 
 -- We lean on the fact that primary keys of all that spaces are
--- the same. Otherwise we would need to use different merger
--- context for each merge.
+-- the same. Otherwise we would need to use different key_defs for
+-- each merge.
 local key_parts = conns[1].space.a.index.pk.parts
-local ctx = merger.context.new(key_def.new(key_parts))
+local key_def = key_def_lib.new(key_parts)
 
 -- The idea modelled here is that we have requests for several
 -- spaces and acquire results in one net.box call.
@@ -76,7 +76,7 @@ local res = {}
 for _ = 1, #requests do
     -- Merge ith result from each storage. On the first step they
     -- are results from space 'a', one the second from 'b', etc.
-    local tuples = merger.new(ctx, sources):select()
+    local tuples = merger.new(key_def, sources):select()
     table.insert(res, tuples)
 end
 

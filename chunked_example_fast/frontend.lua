@@ -3,24 +3,24 @@
 local buffer = require('buffer')
 local msgpack = require('msgpack')
 local vshard = require('vshard')
-local key_def = require('key_def')
+local key_def_lib = require('key_def')
 local merger = require('merger')
 local json = require('json')
 local yaml = require('yaml')
 local vshard_cfg = require('vshard_cfg')
 
-local merger_context_cache = {}
+local key_def_cache = {}
 
 -- XXX: Implement some cache clean up strategy and a way to manual
 -- cache purge.
-local function get_merger_context(space_name, index_name)
-    local merger_context
+local function get_key_def(space_name, index_name)
+    local key_def
 
     -- Get from the cache if exists.
-    if merger_context_cache[space_name] ~= nil then
-        merger_context = merger_context_cache[space_name][index_name]
-        if merger_context ~= nil then
-            return merger_context
+    if key_def_cache[space_name] ~= nil then
+        key_def = key_def_cache[space_name][index_name]
+        if key_def ~= nil then
+            return key_def
         end
     end
 
@@ -30,21 +30,18 @@ local function get_merger_context(space_name, index_name)
     local index = conn.space[space_name].index[index_name]
 
     -- Create a key def.
-    local key_def_inst = key_def.new(index.parts)
+    key_def = key_def_lib.new(index.parts)
     if not index.unique then
-        key_def_inst = key_def_inst:merge(key_def.new(primary_index.parts))
+        key_def = key_def_inst:merge(key_def_lib.new(primary_index.parts))
     end
-
-    -- Create a merger context.
-    merger_context = merger.context.new(key_def_inst)
 
     -- Write to the cache.
-    if merger_context_cache[space_name] == nil then
-        merger_context_cache[space_name] = {}
+    if key_def_cache[space_name] == nil then
+        key_def_cache[space_name] = {}
     end
-    merger_context_cache[space_name][index_name] = merger_context
+    key_def_cache[space_name][index_name] = key_def
 
-    return merger_context
+    return key_def
 end
 
 local function decode_metainfo(buf)
@@ -101,7 +98,7 @@ end
 
 local function mr_call(space_name, index_name, key, opts)
     local opts = opts or {}
-    local merger_context = get_merger_context(space_name, index_name)
+    local key_def = get_key_def(space_name, index_name)
     local call_args = {space_name, index_name, key, opts}
 
     -- Request a first data chunk and create merger sources.
@@ -126,7 +123,7 @@ local function mr_call(space_name, index_name, key, opts)
         table.insert(merger_sources, source)
     end
 
-    local merger_inst = merger.new(merger_context, merger_sources)
+    local merger_inst = merger.new(key_def, merger_sources)
     return merger_inst:select()
 end
 
