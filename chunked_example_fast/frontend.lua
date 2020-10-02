@@ -32,7 +32,7 @@ local function get_key_def(space_name, index_name)
     -- Create a key def.
     key_def = key_def_lib.new(index.parts)
     if not index.unique then
-        key_def = key_def_inst:merge(key_def_lib.new(primary_index.parts))
+        key_def = key_def:merge(key_def_lib.new(primary_index.parts))
     end
 
     -- Write to the cache.
